@@ -5,7 +5,7 @@
 #include <string.h>
 #include <conio.h>
 #include <assert.h>
-
+#include "lz4/lz4hc.h"
 //ARJ-7..: 837370
 //Paq8x..: 593102
 
@@ -32,8 +32,10 @@ struct FileEntry
 
 enum
 {
-	ARJ7_METHOD		= 1<<1,
-	PACK_ARJ4		= 1<<6,
+	UNPACKED,
+	ARJ7_METHOD,
+	LZ4_METHOD,
+	PACK_ARJ4,
 };
 
 typedef struct
@@ -121,7 +123,7 @@ private:
 	u8*			m_pCurrentBootPatch;
 };
 
-mfile_t *fileLoad(const char *name, int alignSize = 2)
+mfile_t *fileLoad(const char *name)
 {
 
 	mfile_t *pRet = NULL;
@@ -132,12 +134,6 @@ mfile_t *fileLoad(const char *name, int alignSize = 2)
 		fseek(in, 0, SEEK_END);
 		int size = ftell(in);
 		fseek(in, 0, SEEK_SET);
-		if (alignSize > 0)
-		{
-			size += (alignSize - 1);
-			size = (size / alignSize) * alignSize;
-		}
-
 		unsigned char* pData = (unsigned char*)malloc(size);
 		if (pData)
 		{
@@ -561,10 +557,33 @@ u8	*arjSkipHeader(u8 *pData)
 
 }
 
+static mfile_t*	LZ4Pack(const char* sFilename)
+{
+	mfile_t* src = fileLoad(sFilename);	// no alignment
+	if (NULL == src)
+		return NULL;
+
+	int dstBufferSize = LZ4_compressBound(src->size);
+	u8* buffer = (u8*)malloc(dstBufferSize);
+	int packedSize = LZ4_compress_HC((const char*)src->pData, (char*)buffer, src->size, dstBufferSize, LZ4HC_CLEVEL_MAX);
+	assert(packedSize);
+
+	mfile_t* ret = (mfile_t*)malloc(sizeof(mfile_t));
+	ret->pData = buffer;
+	ret->size = packedSize;
+	fileFree(src);
+	return ret;
+}
+
 
 mfile_t*	PackFile( const char* pSource, int iPackingMethod )
 {
 	char sArchive[ _MAX_PATH ];
+
+	if (iPackingMethod == LZ4_METHOD)
+	{
+		return LZ4Pack(pSource);
+	}
 
 	// create the packed file
 	*sArchive = 0;
@@ -601,29 +620,6 @@ mfile_t*	PackFile( const char* pSource, int iPackingMethod )
 	remove( sArchive );
 	return pFile;
 }
-
-u32	GetARJSize( u8* pRaw )
-{
-
-	assert((0x60 == pRaw[0]) && (0xea == pRaw[1]));
-	// arj file ( http://datacompression.info/ArchiveFormats/arj.txt )
-	u8 *pData = arjSkipHeader(pRaw);
-	u8 *pData2 = NULL;
-	if (pData)
-		pData2 = arjSkipHeader(pData);
-
-	if ((pData) && (pData2))
-	{
-		unsigned long* pD = (unsigned long*)(pData+16);
-		int arjSize = *pD;								// Taille
-		u32 iPackedSize = (arjSize + 2);				// packed stream + 2 NULL bytes
-		iPackedSize = (iPackedSize+1)&(-2);
-		return iPackedSize;
-	}
-
-	return 0xffffffff;
-}
-
 
 static	u32	Read32(const u32* p)
 {
@@ -698,7 +694,7 @@ bool	CScreen::LoadScreen(const char *sFname,Type type, u16 arg, char* sRoot)
 		packingMethod = 0;
 
 	if (KERNEL == type)
-		packingMethod = PACK_ARJ4;
+		packingMethod = LZ4_METHOD;
 
 	mfile_t* pOriginal = fileLoad( pFilename );
 	if (NULL == pOriginal)
@@ -717,69 +713,79 @@ bool	CScreen::LoadScreen(const char *sFname,Type type, u16 arg, char* sRoot)
 		m_packedSize = m_originalSize = iSize;
 		m_pBuffer = (u8*)malloc( iSize );
 		memcpy(m_pBuffer, pOriginal->pData, pOriginal->size );
-		fileFree( pOriginal );
 	}
 	else
 	{
 		mfile_t* pArj7 = NULL;
-		fileFree( pOriginal );
-
 		pArj7 = PackFile(pFilename, packingMethod);
-
 		if ( NULL == pArj7 )
 		{
 			printf("ERROR: Unable to get result from \"%s\"\n", sFname );
 			return false;
 		}
 
-		if ((0x60 == pArj7->pData[0]) && (0xea == pArj7->pData[1]))
+		if (LZ4_METHOD == packingMethod)
 		{
-			// arj file ( http://datacompression.info/ArchiveFormats/arj.txt )
-			u8 *pData = arjSkipHeader(pArj7->pData);
-			u8 *pData2 = NULL;
-			if (pData)
-				pData2 = arjSkipHeader(pData);
-
-			if ((pData) && (pData2))
-			{
-				
-				unsigned long* pD = (unsigned long*)(pData+20);
-				m_originalSize = *pD;
-				m_originalSize = (m_originalSize+1)&(-2);
-				pD = (unsigned long*)(pData+16);
-				int arjSize = *pD;				// Taille
-
-				m_packedSize = (arjSize + 2);				// packed stream + 2 NULL bytes
-				m_packedSize = (m_packedSize+1)&(-2);
-
-				if (PACK_ARJ4 == packingMethod)
-				{
-					m_pBuffer = (u8*)malloc(m_packedSize + 4);
-					memset(m_pBuffer, 0, m_packedSize+4);
-					*((int*)m_pBuffer) = bswap(m_originalSize);
-					memcpy(m_pBuffer+4, pData2, arjSize);		// taille + crc16
-					m_packedSize += 4;
-				}
-				else
-				{
-					m_pBuffer = (u8*)malloc(m_packedSize);
-					memset(m_pBuffer, 0, m_packedSize);
-					memcpy(m_pBuffer, pData2, arjSize);		// taille + crc16
-				}
-
-			}
+			int srcSize = pOriginal->size;
+			m_originalSize = (srcSize + 1)&(-2);
+			m_packedSize = (pArj7->size + 4);				// packed stream + 2 NULL bytes
+			m_packedSize = (m_packedSize + 1)&(-2);
+			m_pBuffer = (u8*)malloc(m_packedSize);
+			memset(m_pBuffer, 0, m_packedSize);
+			*((int*)m_pBuffer) = bswap(pArj7->size);
+			memcpy(m_pBuffer + 4, pArj7->pData, pArj7->size);
 		}
 		else
 		{
-			printf("FATAL: Bad ARJ7 packed file\n");
-			assert( false );
-			exit(1);
-		}
+			if ((0x60 == pArj7->pData[0]) && (0xea == pArj7->pData[1]))
+			{
+				// arj file ( http://datacompression.info/ArchiveFormats/arj.txt )
+				u8 *pData = arjSkipHeader(pArj7->pData);
+				u8 *pData2 = NULL;
+				if (pData)
+					pData2 = arjSkipHeader(pData);
 
+				if ((pData) && (pData2))
+				{
+
+					unsigned long* pD = (unsigned long*)(pData + 20);
+					m_originalSize = *pD;
+					m_originalSize = (m_originalSize + 1)&(-2);
+					pD = (unsigned long*)(pData + 16);
+					int arjSize = *pD;				// Taille
+
+					m_packedSize = (arjSize + 2);				// packed stream + 2 NULL bytes
+					m_packedSize = (m_packedSize + 1)&(-2);
+
+					if (PACK_ARJ4 == packingMethod)
+					{
+						m_pBuffer = (u8*)malloc(m_packedSize + 4);
+						memset(m_pBuffer, 0, m_packedSize + 4);
+						*((int*)m_pBuffer) = bswap(m_originalSize);
+						memcpy(m_pBuffer + 4, pData2, arjSize);		// taille + crc16
+						m_packedSize += 4;
+					}
+					else
+					{
+						m_pBuffer = (u8*)malloc(m_packedSize);
+						memset(m_pBuffer, 0, m_packedSize);
+						memcpy(m_pBuffer, pData2, arjSize);		// taille + crc16
+					}
+
+				}
+			}
+			else
+			{
+				printf("FATAL: Bad ARJ7 packed file\n");
+				assert(false);
+				exit(1);
+			}
+		}
 		if (pArj7)
 			fileFree( pArj7 );
 	}
 
+	fileFree( pOriginal );
 	return true;
 }
 

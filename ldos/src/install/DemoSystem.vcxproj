@@ -98,6 +98,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="install.cpp" />
+    <ClCompile Include="lz4\lz4.cpp" />
+    <ClCompile Include="lz4\lz4hc.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="lz4\lz4.h" />
+    <ClInclude Include="lz4\lz4hc.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
