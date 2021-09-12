@@ -274,8 +274,8 @@ floppyInt:
 			move.l	m_MFMRawBuffer(a1),m_MFMCurrentPtr(a1)
 			move.w	#-1,m_flag(a1)			; marker decoder buffer as ready for async decoder
 
-;			lea		MFMDecoderPatch(pc),a0
-;			move.w	#$4e41,(a0)					; patch with trap #1
+			lea		MFMDecoderPatch(pc),a0
+			move.w	#$4e41,(a0)					; patch with trap #1
 
 			lea		decoderPut(pc),a0
 			eori.w	#16,(a0)				; flip buffer
@@ -429,8 +429,9 @@ MFMDecoderTickIfAny:
 			bsr.s	MFMDecodeTrackCallback
 
 .nothing:	
-;            lea		MFMDecoderPatch(pc),a1
-;			move.w	#$4e71,(a1)
+            lea		MFMDecoderPatch(pc),a1
+			move.w	#$4e71,(a1)
+
 			move.l	(a7)+,a1
 ;			move.w	#$0,$dff180
 			rte

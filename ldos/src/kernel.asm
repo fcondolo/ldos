@@ -672,16 +672,9 @@ loadFile:
 			
 		; start trackloader !!
 			bsr		trackLoadStart
-
-        ; APDepacker can't run async now, so busy wait the loading
-.wdisk:     bsr     MFMDecodeTrackCallback
-            tst.w   2(a1)           ; +2 is trkSectorsToDecode
-            bne.s   .wdisk
 					
 		; now loading is running async, we could alloc a mem block for depacked data
 		; and run the depacker in the main thread (depacker takes care or loading ptr)		
-
-    move.w d0,$100.w
 			move.l	(a7)+,a0
 			add.w	sectorOffset(pc),a0		; packed data ad
 			move.l	m_ad(a6),a1
@@ -1170,7 +1163,7 @@ kernelCrcEnd:
 	;-------------------------------------------------------------------				
 	; APLib depacker
 	;-------------------------------------------------------------------				
-		include "unaplib.asm"
+		include "unaplib_async.asm"
 
 	;-------------------------------------------------------------------				
 	; Module Player
