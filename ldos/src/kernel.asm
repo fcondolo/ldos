@@ -672,15 +672,22 @@ loadFile:
 			
 		; start trackloader !!
 			bsr		trackLoadStart
+
+        ; APDepacker can't run async now, so busy wait the loading
+.wdisk:     bsr     MFMDecodeTrackCallback
+            tst.w   2(a1)           ; +2 is trkSectorsToDecode
+            bne.s   .wdisk
 					
 		; now loading is running async, we could alloc a mem block for depacked data
 		; and run the depacker in the main thread (depacker takes care or loading ptr)		
-			move.l	(a7)+,a1
-			add.w	sectorOffset(pc),a1		; packed data ad
-			move.l	m_ad(a6),a0
+
+    move.w d0,$100.w
+			move.l	(a7)+,a0
+			add.w	sectorOffset(pc),a0		; packed data ad
+			move.l	m_ad(a6),a1
 		
 		; run the depacker (packed data are loading async)
-			bsr		mainThreadDepack
+			bsr		apl_decompress
 
 		; free tackloading buffers
 			moveq	#MEMLABEL_TRACKLOAD,d0
@@ -1161,9 +1168,9 @@ kernelCrcEnd:
 		include "lz4_depack.asm"
 		
 	;-------------------------------------------------------------------				
-	; ARJ mode 7 depacker 
+	; APLib depacker
 	;-------------------------------------------------------------------				
-		include "arj7.asm"
+		include "unaplib.asm"
 
 	;-------------------------------------------------------------------				
 	; Module Player
@@ -1174,7 +1181,7 @@ musicPlayer:
 
 crcProceedInfo:
 		dc.w	kernelCrcStart - kernelStart, kernelCrcEnd - kernelCrcStart,0
-		dc.w	arjCrcStart - kernelStart, arjCrcEnd - arjCrcStart,0
+;		dc.w	arjCrcStart - kernelStart, arjCrcEnd - arjCrcStart,0
 		dc.w	loaderCrcStart - kernelStart, loaderCrcEnd - loaderCrcStart,0
 		dc.w	relocCrcStart - kernelStart, relocCrcEnd - relocCrcStart,0
 		dc.w	memoryCrcStart - kernelStart, memoryCrcEnd - memoryCrcStart,0

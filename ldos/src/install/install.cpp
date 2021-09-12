@@ -5,7 +5,8 @@
 #include <string.h>
 #include <conio.h>
 #include <assert.h>
-#include "lz4/lz4hc.h"
+#include "apultra/libapultra.h"
+#include "apultra/depacks.h"
 //ARJ-7..: 837370
 //Paq8x..: 593102
 
@@ -34,7 +35,7 @@ enum
 {
 	UNPACKED,
 	ARJ7_METHOD,
-	LZ4_METHOD,
+	APULTRA_METHOD,
 	PACK_ARJ4,
 };
 
@@ -46,11 +47,10 @@ typedef struct
 
 static	char	sInstallPath[ _MAX_PATH ];
 static	char	sArjPath[_MAX_PATH];
-static	char	sLZ4Path[_MAX_PATH];
 
 bool	g_bPack = true;
 int		g_iCurrentAlign = 2;
-int		g_iDefaultPacker = ARJ7_METHOD;
+int		g_iDefaultPacker = APULTRA_METHOD;// ARJ7_METHOD;
 bool	g_bUsePad = false;
 
 class CScreen
@@ -493,7 +493,7 @@ static	const char*	typeToPackerName(CScreen::Type t)
 		return "---";
 		break;
 	case CScreen::KERNEL:
-		return "AR4";
+		return "APU";
 		break;
 	case CScreen::SCREEN:
 		return "AR7";
@@ -557,16 +557,41 @@ u8	*arjSkipHeader(u8 *pData)
 
 }
 
-static mfile_t*	LZ4Pack(const char* sFilename)
+static mfile_t*	APUltraPack(const char* sFilename)
 {
 	mfile_t* src = fileLoad(sFilename);	// no alignment
 	if (NULL == src)
 		return NULL;
 
-	int dstBufferSize = LZ4_compressBound(src->size);
+	int dstBufferSize = apultra_get_max_compressed_size(src->size);
 	u8* buffer = (u8*)malloc(dstBufferSize);
-	int packedSize = LZ4_compress_HC((const char*)src->pData, (char*)buffer, src->size, dstBufferSize, LZ4HC_CLEVEL_MAX);
+//	int packedSize = apultra_compress((const char*)src->pData, (char*)buffer, src->size, dstBufferSize, LZ4HC_CLEVEL_MAX);
+	printf("Packing %d bytes... (%s)\n", src->size, sFilename);
+	int packedSize = apultra_compress((const u8*)src->pData, buffer, src->size, dstBufferSize, 0, 0, 0, NULL, NULL);
 	assert(packedSize);
+
+	for (int i = 0; i < 16; i++)
+		printf("%02x ", buffer[i]);
+	printf("\n");
+
+	// check depacking
+/*
+	u8* checkBuffer = (u8*)malloc(src->size);
+	int ret2 = aP_depack_safe((const void*)buffer, packedSize, checkBuffer, src->size);
+	if (ret2 != src->size)
+	{
+		printf("ERROR: ret2/size = %d/%d\n", ret2, src->size);
+	}
+	if (memcmp(checkBuffer, src->pData, src->size))
+	{
+		printf("ERROR With APULTRA!\n");
+	}
+	else
+	{
+		printf("  ApUltra depacking ok\n");
+	}
+*/
+
 
 	mfile_t* ret = (mfile_t*)malloc(sizeof(mfile_t));
 	ret->pData = buffer;
@@ -575,14 +600,13 @@ static mfile_t*	LZ4Pack(const char* sFilename)
 	return ret;
 }
 
-
 mfile_t*	PackFile( const char* pSource, int iPackingMethod )
 {
 	char sArchive[ _MAX_PATH ];
 
-	if (iPackingMethod == LZ4_METHOD)
+	if (iPackingMethod == APULTRA_METHOD)
 	{
-		return LZ4Pack(pSource);
+		return APUltraPack(pSource);
 	}
 
 	// create the packed file
@@ -694,7 +718,7 @@ bool	CScreen::LoadScreen(const char *sFname,Type type, u16 arg, char* sRoot)
 		packingMethod = 0;
 
 	if (KERNEL == type)
-		packingMethod = LZ4_METHOD;
+		packingMethod = APULTRA_METHOD;
 
 	mfile_t* pOriginal = fileLoad( pFilename );
 	if (NULL == pOriginal)
@@ -724,16 +748,15 @@ bool	CScreen::LoadScreen(const char *sFname,Type type, u16 arg, char* sRoot)
 			return false;
 		}
 
-		if (LZ4_METHOD == packingMethod)
+		if (APULTRA_METHOD == packingMethod)
 		{
 			int srcSize = pOriginal->size;
 			m_originalSize = (srcSize + 1)&(-2);
-			m_packedSize = (pArj7->size + 4);				// packed stream + 2 NULL bytes
+			m_packedSize = (pArj7->size);
 			m_packedSize = (m_packedSize + 1)&(-2);
 			m_pBuffer = (u8*)malloc(m_packedSize);
 			memset(m_pBuffer, 0, m_packedSize);
-			*((int*)m_pBuffer) = bswap(pArj7->size);
-			memcpy(m_pBuffer + 4, pArj7->pData, pArj7->size);
+			memcpy(m_pBuffer, pArj7->pData, pArj7->size);
 		}
 		else
 		{
@@ -953,7 +976,6 @@ int	main(int _argc, char *_argv[])
 	_makepath_s(sInstallPath, _MAX_PATH, sDrive, sDir, NULL, NULL);
 
 	_makepath_s(sArjPath, _MAX_PATH, sDrive, sDir, "arjbeta", "exe");
-	_makepath_s(sLZ4Path, _MAX_PATH, sDrive, sDir, "lz4", "exe");
 
 	static	const	char*	sDiskNames[2] = {"Demo_d1.adf","Demo_d2.adf"};
 	static	const	char*	sSTDiskNames[2] = {NULL,NULL};

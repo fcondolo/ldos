@@ -73,7 +73,6 @@ start0:
 
 	; WARNING: do NOT remove this NOP. hdd_loader.exe jump here at the NOP place
 	nop
-		move.w	d0,$100.w
 	lea		(kernelStart-bootStart)(a0),a0
 	pea		(a1)
 	
@@ -85,7 +84,6 @@ start0:
 ; packed data in a0
 ; dest in a1
 decode:
-		move.l	(a0)+,d0				; original size
-		include "lz4_smallest.asm"
+		include "unaplib.asm"
 
 kernelStart:

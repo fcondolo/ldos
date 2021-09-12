@@ -16,7 +16,7 @@ win32.cpu_idle=150
 ; common
 use_gui=no
 use_debugger=false
-kickstart_rom_file=Kickstart13.rom
+kickstart_rom_file=X:\leonard\AMIGA\ROMs\Kickstart13.rom
 kickstart_rom_file_id=C4F0F55F,KS ROM v1.3 (A500,A1000,A2000)
 kickstart_ext_rom_file=
 ide_mb_rom_file=:ENABLED

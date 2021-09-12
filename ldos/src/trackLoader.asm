@@ -160,6 +160,7 @@ trackLoadStart:
 			
 			move.l	a0,(SVAR_LOAD_PTR).w
 			move.w	d1,trkSectorCount(a6)
+			move.w	d1,trkSectorsToDecode(a6)
 
 			add.w	d0,d1				; sector end
 			subq.w	#1,d1
@@ -273,8 +274,8 @@ floppyInt:
 			move.l	m_MFMRawBuffer(a1),m_MFMCurrentPtr(a1)
 			move.w	#-1,m_flag(a1)			; marker decoder buffer as ready for async decoder
 
-			lea		MFMDecoderPatch(pc),a0
-			move.w	#$4e41,(a0)					; patch with trap #1
+;			lea		MFMDecoderPatch(pc),a0
+;			move.w	#$4e41,(a0)					; patch with trap #1
 
 			lea		decoderPut(pc),a0
 			eori.w	#16,(a0)				; flip buffer
@@ -427,8 +428,9 @@ MFMDecoderTickIfAny:
 			beq.s	.nothing
 			bsr.s	MFMDecodeTrackCallback
 
-.nothing:	lea		MFMDecoderPatch(pc),a1
-			move.w	#$4e71,(a1)
+.nothing:	
+;            lea		MFMDecoderPatch(pc),a1
+;			move.w	#$4e71,(a1)
 			move.l	(a7)+,a1
 ;			move.w	#$0,$dff180
 			rte
@@ -470,6 +472,8 @@ MFMDecodeTrackCallback:
 			bsr		MFMSectorDecode			
 			tst.b	d0
 			bne.s	diskCrcError
+            
+			subq.w	#1,trkSectorsToDecode(a6)
 			subq.w	#1,m_sectorCount(a5)
 
 .skip:		lea		(56+512*2)(a0),a0					; skip odd bits for next turn
@@ -633,6 +637,7 @@ decoderGet:		dc.w	0
 		rsreset
 trkState:			rs.w	1
 trkDiskBusy:		rs.w	1
+trkSectorsToDecode: rs.w    1
 trkSectorCount:		rs.w	1
 trkTrack:			rs.w	1
 trkWantedTrack:		rs.w	1

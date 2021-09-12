@@ -97,13 +97,26 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="apultra\depacks.c" />
+    <ClCompile Include="apultra\expand.c" />
+    <ClCompile Include="apultra\libdivsufsort\lib\divsufsort.c" />
+    <ClCompile Include="apultra\libdivsufsort\lib\divsufsort_utils.c" />
+    <ClCompile Include="apultra\libdivsufsort\lib\sssort.c" />
+    <ClCompile Include="apultra\libdivsufsort\lib\trsort.c" />
+    <ClCompile Include="apultra\matchfinder.c" />
+    <ClCompile Include="apultra\shrink.c" />
     <ClCompile Include="install.cpp" />
-    <ClCompile Include="lz4\lz4.cpp" />
-    <ClCompile Include="lz4\lz4hc.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="lz4\lz4.h" />
-    <ClInclude Include="lz4\lz4hc.h" />
+    <ClInclude Include="apultra\depacks.h" />
+    <ClInclude Include="apultra\expand.h" />
+    <ClInclude Include="apultra\format.h" />
+    <ClInclude Include="apultra\libapultra.h" />
+    <ClInclude Include="apultra\libdivsufsort\include\divsufsort.h" />
+    <ClInclude Include="apultra\libdivsufsort\include\divsufsort_config.h" />
+    <ClInclude Include="apultra\libdivsufsort\include\divsufsort_private.h" />
+    <ClInclude Include="apultra\matchfinder.h" />
+    <ClInclude Include="apultra\shrink.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

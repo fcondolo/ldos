@@ -2,24 +2,66 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="install.cpp" />
-    <ClCompile Include="lz4\lz4.cpp">
-      <Filter>lz4</Filter>
+    <ClCompile Include="apultra\expand.c">
+      <Filter>apultra</Filter>
     </ClCompile>
-    <ClCompile Include="lz4\lz4hc.cpp">
-      <Filter>lz4</Filter>
+    <ClCompile Include="apultra\matchfinder.c">
+      <Filter>apultra</Filter>
+    </ClCompile>
+    <ClCompile Include="apultra\shrink.c">
+      <Filter>apultra</Filter>
+    </ClCompile>
+    <ClCompile Include="apultra\libdivsufsort\lib\divsufsort.c">
+      <Filter>apultra\libdivsufsort</Filter>
+    </ClCompile>
+    <ClCompile Include="apultra\libdivsufsort\lib\divsufsort_utils.c">
+      <Filter>apultra\libdivsufsort</Filter>
+    </ClCompile>
+    <ClCompile Include="apultra\libdivsufsort\lib\sssort.c">
+      <Filter>apultra\libdivsufsort</Filter>
+    </ClCompile>
+    <ClCompile Include="apultra\libdivsufsort\lib\trsort.c">
+      <Filter>apultra\libdivsufsort</Filter>
+    </ClCompile>
+    <ClCompile Include="apultra\depacks.c">
+      <Filter>apultra</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="lz4">
-      <UniqueIdentifier>{fad9bcf8-1a28-4281-b194-8d115c7c85dc}</UniqueIdentifier>
+    <Filter Include="apultra">
+      <UniqueIdentifier>{695fd4a8-5255-4992-a88b-872b6ef2a10b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="apultra\libdivsufsort">
+      <UniqueIdentifier>{ea1ac15e-3b8d-41a3-bfb6-a9089b20dfad}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="lz4\lz4.h">
-      <Filter>lz4</Filter>
+    <ClInclude Include="apultra\expand.h">
+      <Filter>apultra</Filter>
     </ClInclude>
-    <ClInclude Include="lz4\lz4hc.h">
-      <Filter>lz4</Filter>
+    <ClInclude Include="apultra\format.h">
+      <Filter>apultra</Filter>
+    </ClInclude>
+    <ClInclude Include="apultra\libapultra.h">
+      <Filter>apultra</Filter>
+    </ClInclude>
+    <ClInclude Include="apultra\matchfinder.h">
+      <Filter>apultra</Filter>
+    </ClInclude>
+    <ClInclude Include="apultra\shrink.h">
+      <Filter>apultra</Filter>
+    </ClInclude>
+    <ClInclude Include="apultra\libdivsufsort\include\divsufsort.h">
+      <Filter>apultra\libdivsufsort</Filter>
+    </ClInclude>
+    <ClInclude Include="apultra\libdivsufsort\include\divsufsort_config.h">
+      <Filter>apultra\libdivsufsort</Filter>
+    </ClInclude>
+    <ClInclude Include="apultra\libdivsufsort\include\divsufsort_private.h">
+      <Filter>apultra\libdivsufsort</Filter>
+    </ClInclude>
+    <ClInclude Include="apultra\depacks.h">
+      <Filter>apultra</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
