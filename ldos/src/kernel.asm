@@ -304,17 +304,6 @@ runLoadedFile:
 			moveq	#MEMLABEL_PRECACHED_FX,d0
 			bsr		unmarkMemLabel
 
-		; first of all, maybe a MUSIC is already loaded, so reloc it
-			move.l	(nextMusic+m_ad)(pc),d0
-			beq.s	.noMusic
-			
-			bsr		relocP61
-
-			lea		nextMusic(pc),a0
-			clr.l	m_ad(a0)
-
-.noMusic:				
-
 		; from here, the memory used for the cached file is marked as "FREE"
 		; all next "alloc" will return pointers "lower", but may overlap.
 			move.b	#MEMLABEL_USER_FX,(SVAR_CURRENT_MEMLABEL).w		; all new alloc will now be part of the "FX to be run"
@@ -619,7 +608,6 @@ loadFile:
 			lea		nextEXEAllocs(pc),a0
 			move.l	#MFM_DMA_SIZE,(a0)+
 			move.l	#MFM_DMA_SIZE,(a0)+
-			move.l	#13320 | LDOS_MEM_ANY_RAM,(a0)+
 			lea		nextEXEAllocs(pc),a0
 			bsr		batchAllocator
 
@@ -707,6 +695,14 @@ loadNextFile:
 			lea		nextMusic(pc),a0
 			movem.l	d0-d2,(a0)
 			
+			moveq	#MEMLABEL_PRECACHED_FX,d0
+			bsr		unmarkMemLabel
+            
+			bsr		relocP61
+
+			lea		nextMusic(pc),a0
+			clr.l	m_ad(a0)
+
 			lea		currentFile(pc),a0
 			addq.w	#1,(a0)
 			move.w	(a0),d0
@@ -1228,7 +1224,6 @@ nextEXEPacked:		dc.l	0
 nextEXEAllocs:
 pMFMRawBuffer1:		dc.l	0	;MFM_DMA_SIZE
 pMFMRawBuffer2:		dc.l	0	;MFM_DMA_SIZE
-pArj7Buffer:		dc.l	0	;13320 | LDOS_MEM_ANY_RAM		; ARJ Method 7 depacking buffer
 					dc.l	-2
 		
 directory:		; NOTE: Directory data are directly appended here by the installer
