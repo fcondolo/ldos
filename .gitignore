@@ -349,6 +349,7 @@ MigrationBackup/
 .ionide/
 
 demo/greetings/*.bin
+demo/greetings/*.adf
 demo/sprites_loader/*.bin
+demo/sprites_loader/*.adf
 demo/*.adf
-

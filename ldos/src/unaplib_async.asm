@@ -33,13 +33,14 @@ apl_decompress:
                lea 128.w,a4         ; load 128 offset constant
                move.l a1,a5         ; save destination pointer
 
-.literal:      cmp.l	(SVAR_LOAD_PTR).w,a0
+MFMDecoderPatch:    nop				; DO NOT REMOVE (patched for smoother trackloading)
+				cmp.l	(SVAR_LOAD_PTR).w,a0
                bhs		.needData1
 .backData1:	   move.b (a0)+,(a1)+   ; copy literal byte
 .after_lit:    moveq #3,d2          ; set LWM flag
 
 .next_token:   bsr .get_bit       ; read 'literal or match' bit
-               bcc.s .literal       ; if 0: literal
+               bcc.s MFMDecoderPatch       ; if 0: literal
 
                bsr .get_bit       ; read '8+n bits or other type' bit
                bcs.s .other_match   ; if 11x: other type of match
@@ -132,9 +133,10 @@ apl_decompress:
 .needData3:		bsr	MFMDecodeTrackCallback
 				bra .backData3
 
-.needData4:     pea    .backData4(pc)
-                move.w sr,-(a7)      ; store flags (X bit)
+.needData4:     subx.b d1,d1				; read X flag in d1
+				move.w	d1,-(a7)
                 bsr MFMDecodeTrackCallback
-				rtr                     ; tricky: return the X flag
+				move.w (a7)+,d1
+				add.b d1,d1
+				bra.s .backData4                     ; tricky: return the X flag
 
-MFMDecoderPatch:    nop
