@@ -1,121 +1,140 @@
-; -------------------------------------------------------------------------------------------------
-; Aplib decruncher for MC68000 "gcc version"
-; by MML 2010
-; Size optimized (164 bytes) by Franck "hitchhikr" Charlet.
-; small change by Leonard to support smooth depack while loading
-; -------------------------------------------------------------------------------------------------
-; -------------------------------------------------------------------------------------------------
-; aplib_decrunch: A0 = Source / A1 = Destination
-; void aplib_decrunch(unsigned char *source, unsigned char *destination); /* c prototype */
-; -------------------------------------------------------------------------------------------------
+;  unaplib_68000.s - aPLib decompressor for 68000 - 154 bytes
+;
+;  in:  a0 = start of compressed data
+;       a1 = start of decompression buffer
+;  out: d0 = decompressed size
+;
+;  Copyright (C) 2020 Emmanuel Marty
+;  With parts of the code inspired by Franck "hitchhikr" Charlet
+;
+;  This software is provided 'as-is', without any express or implied
+;  warranty.  In no event will the authors be held liable for any damages
+;  arising from the use of this software.
+;
+;  Permission is granted to anyone to use this software for any purpose,
+;  including commercial applications, and to alter it and redistribute it
+;  freely, subject to the following restrictions:
+;
+;  1. The origin of this software must not be misrepresented; you must not
+;     claim that you wrote the original software. If you use this software
+;     in a product, an acknowledgment in the product documentation would be
+;     appreciated but is not required.
+;  2. Altered source versions must be plainly marked as such, and must not be
+;     misrepresented as being the original software.
+;  3. This notice may not be removed or altered from any source distribution.
+
 apl_decompress:
-aplib_decrunch:         
-                        movem.l a2-a5/d2-d6,-(a7)
-                        lea     32000.w,a3
-                        lea     1280.w,a4
-                        lea     128.w,a5
-                        moveq   #1,d5           ; Initialize bits counter
-copy_byte:              cmp.l	(SVAR_LOAD_PTR).w,a0
-						bhs		needData1
-backData1:				move.b  (a0)+,(a1)+
-next_sequence_init:     moveq   #0,d1           ; Initialize LWM
-next_sequence:          bsr.b   get_bit
-                        bcc.b   copy_byte       ; if bit sequence is %0..., then copy next byte
-MFMDecoderPatch:		nop						; DO NOT REMOVE THIS NOP (patched by trackloader to make async depacking smooth)
-                        bsr.b   get_bit
-                        bcc.b   code_pair       ; if bit sequence is %10..., then is a code pair
-                        moveq   #0,d0           ; offset = 0 (eor.l d0,d0)
-                        bsr.b   get_bit
-                        bcc.b   short_match     ; if bit sequence is %110..., then is a short match
+               movem.l d2-d3/a2-a6,-(a7)
 
-                        ; The sequence is %111..., the next 4 bits are the offset (0-15)
-                        moveq   #4-1,d6
-get_3_bits:             bsr.b   get_bit
-                        roxl.l  #1,d0
-                        dbf     d6,get_3_bits   ; (dbcc doesn't modify flags)
-                        beq.b   write_byte      ; if offset == 0, then write 0x00
+               moveq #-128,d1       ; initialize empty bit queue
+                                    ; plus bit to roll into carry
+               lea 32000.w,a2       ; load 32000 offset constant
+               lea 1280.w,a3        ; load 1280 offset constant
+               lea 128.w,a4         ; load 128 offset constant
+               move.l a1,a5         ; save destination pointer
 
-                        ; If offset != 0, then write the byte on destination - offset
-                        move.l  a1,a2
-                        suba.l  d0,a2
-                        move.b  (a2),d0
-write_byte:             move.b  d0,(a1)+
-                        bra.b   next_sequence_init
-; Code pair %10...
-code_pair:              bsr.b   decode_gamma
-                        move.l  d2,d0           ; get the new offset
-                        subq.l  #2,d0           ; offset == 2?
-                        bne.b   normal_code_pair
-                        tst.w   d1              ; LMW == 0?
-                        bne.b   normal_code_pair
-                        move.l  d4,d0           ; offset = old_offset
-                        bsr.b   decode_gamma
-                        bra.b   copy_code_pair
-normal_code_pair:       add.l   d1,d0           ; (d1 is either 1 or 0)
-                        subq.l  #1,d0           ; offset -= 1 (or 0)
-                        lsl.l   #8,d0           ; offset << 8
-                        cmp.l	(SVAR_LOAD_PTR).w,a0
-						bhs.s	needData2
-backData2:				move.b  (a0)+,d0        ; get the least significant byte of the offset (16 bits)
-                        bsr.b   decode_gamma
-                        cmp.l   a3,d0           ; >=32000
-                        blt.b   compare_1280
-                        addq.l  #2,d2           ; length += 2
-                        bra.b   continue_short_match
-compare_1280:           cmp.l   a4,d0           ; >=1280 <32000
-                        blt.b   compare_128
-                        addq.l  #1,d2           ; length++
-                        bra.b   continue_short_match
-compare_128:            cmp.l   a5,d0           ; >=128 <1280
-                        bge.b   continue_short_match
-                        addq.l  #2,d2          ; length += 2
-                        bra.b   continue_short_match
+.literal:      cmp.l	(SVAR_LOAD_PTR).w,a0
+               bhs		.needData1
+.backData1:	   move.b (a0)+,(a1)+   ; copy literal byte
+.after_lit:    moveq #3,d2          ; set LWM flag
 
-; get_bit: Get bits from the crunched data (D3) and insert the most significant bit in the carry flag.
-get_bit:                subq.b  #1,d5           ; D5 = bit counter
-                        bne.b   still_bits_left
-                        moveq   #8,d5
-                        cmp.l	(SVAR_LOAD_PTR).w,a0
-						bhs.s	needData3
-backData3:				move.b  (a0)+,d3        ; Read next crunched byte
-still_bits_left:        add.b   d3,d3           ; D3.b << 1 (lsl.b #1,d3 ó roxl.b #1,d3)
-                        rts
+.next_token:   bsr .get_bit       ; read 'literal or match' bit
+               bcc.s .literal       ; if 0: literal
 
-; decode_gamma: Decode values from the crunched data using gamma code
-decode_gamma:           moveq   #1,d2
-get_more_gamma:         bsr.b   get_bit
-                        addx.l  d2,d2
-                        bsr.b   get_bit
-                        bcs.b   get_more_gamma
-                        rts
+               bsr .get_bit       ; read '8+n bits or other type' bit
+               bcs.s .other_match   ; if 11x: other type of match
 
-; Short match %110...
-short_match:            moveq   #3,d2           ; length = 3
-                        cmp.l	(SVAR_LOAD_PTR).w,a0
-						bhs.s	needData4
-backData4:				move.b  (a0)+,d0        ; Get offset (offset is 7 bits + 1 bit to mark if copy 2 or 3 bytes)
-                        lsr.b   #1,d0           
-                        beq.b   end_decrunch    ; if offset == 0, end of decrunching
-                        bcs.b   continue_short_match
-                        moveq   #2,d2           ; length = 2
-continue_short_match:   move.l  d0,d4           ; old_offset = offset
-copy_code_pair:         subq.l  #1,d2           ; length--
-                        move.l  a1,a2
-                        suba.l  d0,a2
-loop_do_copy:           move.b  (a2)+,(a1)+
-                        dbf     d2,loop_do_copy
-                        moveq   #1,d1           ; LWM = 1
-                        bra.w   next_sequence   ; Process next sequence
+               bsr.s .get_gamma2    ; 10: read gamma2-coded high offset bits
+               sub.l d2,d0          ; high offset bits == 2 when LWM == 3 ?
+               bcc.s .no_repmatch   ; if not, not a rep-match
 
-end_decrunch:           movem.l (a7)+,a2-a5/d2-d6
-                        rts
+               bsr.s .get_gamma2    ; read repmatch length
+               bra.s .got_len       ; go copy large match
 
+.no_repmatch:  lsl.l #8,d0          ; shift high offset bits into place
+               cmp.l	(SVAR_LOAD_PTR).w,a0
+               bhs		.needData2
+.backData2:	   move.b (a0)+,d0      ; read low offset byte
+               move.l d0,d3         ; copy offset into d3
 
-needData1:		bsr	MFMDecodeTrackCallback
-				bra backData1
-needData2:		bsr	MFMDecodeTrackCallback
-				bra backData2
-needData3:		bsr	MFMDecodeTrackCallback
-				bra backData3
-needData4:		bsr	MFMDecodeTrackCallback
-				bra backData4
+               bsr.s .get_gamma2    ; read match length
+               cmp.l a2,d3          ; offset >= 32000 ?
+               bge.s .inc_by_2      ; if so, increase match len by 2
+               cmp.l a3,d3          ; offset >= 1280 ?
+               bge.s .inc_by_1      ; if so, increase match len by 1
+               cmp.l a4,d3          ; offset < 128 ?
+               bge.s .got_len       ; if so, increase match len by 2
+.inc_by_2:     addq.l #1,d0         ; increase match len by 1
+.inc_by_1:     addq.l #1,d0         ; increase match len by 1
+
+.got_len:      move.l a1,a6         ; calculate backreference address
+               sub.l d3,a6          ; (dest - match offset)
+               subq.l #1,d0         ; dbf will loop until d0 is -1, not 0
+.copy_match:   move.b (a6)+,(a1)+   ; copy matched byte
+               dbf d0,.copy_match   ; loop for all matched bytes
+               moveq #2,d2          ; clear LWM flag
+               bra.s .next_token    ; go decode next token
+
+.other_match:  bsr.s .get_bit       ; read '7+1 match or short literal' bit
+               bcs.s .short_match   ; if 111: 4 bit offset for 1-byte copy
+
+               moveq #1,d0          ; 110: prepare match length
+               moveq #0,d3          ; clear high bits of offset
+               cmp.l	(SVAR_LOAD_PTR).w,a0
+               bhs		.needData3
+.backData3:	   move.b (a0)+,d3      ; read low bits of offset + length bit
+               lsr.b #1,d3          ; shift offset into place, len into carry
+               beq.s .done          ; check for EOD
+               addx.b d0,d0         ; len = (1 << 1) + carry bit, ie. 2 or 3
+               bra.s .got_len       ; go copy match
+
+.short_match:  moveq #0,d0          ; clear short offset before reading 4 bits
+               bsr.s .get_dibits    ; read a data bit into d0, one into carry
+               addx.b d0,d0         ; shift second bit into d0
+               bsr.s .get_dibits    ; read a data bit into d0, one into carry
+               addx.b d0,d0         ; shift second bit into d0
+               tst.b d0             ; fix!
+               beq.s .write_zero    ; if offset is zero, write a 0
+
+               move.l a1,a6         ; calculate backreference address
+               sub.l d0,a6          ; (dest - short offset)
+               move.b (a6),d0       ; read matched byte
+.write_zero:   move.b d0,(a1)+      ; write matched byte or 0
+               bra.s .after_lit     ; set LWM flag and go decode next token
+
+.done:         move.l a1,d0         ; pointer to last decompressed byte + 1
+               sub.l a6,d0          ; minus start of decompression buffer = size
+               movem.l (a7)+,d2-d3/a2-a6
+               rts
+
+.get_gamma2:   moveq #1,d0          ; init to 1 so it gets shifted to 2 below
+.gamma2_loop:  bsr.s .get_dibits    ; read data bit, shift into d0
+                                    ; and read continuation bit
+               bcs.s .gamma2_loop   ; loop until a 0 continuation bit is read
+               rts
+
+.get_dibits:   bsr.s .get_bit       ; read bit
+               addx.l d0,d0         ; shift into d0
+                                    ; fall through
+.get_bit:      add.b d1,d1          ; shift bit queue, high bit into carry
+               bne.s .got_bit       ; queue not empty, bits remain
+               cmp.l	(SVAR_LOAD_PTR).w,a0
+               bhs.s	.needData4
+.backData4:    move.b (a0)+,d1      ; read 8 new bits
+                addx.b d1,d1         ; shift bit queue, high bit into carry
+                                    ; and shift 1 from carry into bit queue
+.got_bit:      rts
+
+.needData1:		bsr	MFMDecodeTrackCallback
+				bra .backData1
+.needData2:		bsr	MFMDecodeTrackCallback
+				bra .backData2
+.needData3:		bsr	MFMDecodeTrackCallback
+				bra .backData3
+
+.needData4:     pea    .backData4(pc)
+                move.w sr,-(a7)      ; store flags (X bit)
+                bsr MFMDecodeTrackCallback
+				rtr                     ; tricky: return the X flag
+
+MFMDecoderPatch:    nop
