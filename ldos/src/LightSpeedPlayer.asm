@@ -2,7 +2,7 @@
 ;
 ;	Light Speed Player v1.11
 ;	Fastest Amiga MOD player ever :)
-;	Written By Arnaud Carré (aka Leonard / OXYGENE)
+;	Written By Arnaud Carrï¿½ (aka Leonard / OXYGENE)
 ;	https://github.com/arnaud-carre/LSPlayer
 ;	twitter: @leonard_coder
 ;
@@ -52,6 +52,7 @@ LSP_MusicInit:
 			move.l	a2,m_lspInstruments(a3)	; instrument tab addr ( minus 4 )
 			subq.w	#1,d0
 			move.l	a1,d1
+			move.l	a1,m_sampleBase(a3)
 			movea.l	a0,a1					; keep relocated flag
 .relocLoop:	tst.b	(a4)				; bit0 is relocation done flag
 			bne.s	.relocated
@@ -259,6 +260,24 @@ LSP_MusicGetPos:
 			move.w	(LSP_State+m_currentSeq)(pc),d0
 			rts
 
+
+;------------------------------------------------------------------
+;
+;	LSP_GetSampleTable
+;
+;		In:	None
+;		Out: a0.l LSP samples table (m_lspInstruments)
+;		Out: a1.l LSP sound bank (samples data)
+;
+;------------------------------------------------------------------
+LSP_GetSampleTable:
+			lea		LSP_State,a0
+			move.l	m_sampleBase(a0),a1
+			move.l	m_lspInstruments(a0),a0
+			lea    12(a0),a0
+			rts
+
+
 	rsreset
 	
 m_byteStream:		rs.l	1	;  0 byte stream
@@ -276,6 +295,7 @@ m_seqCount:			rs.w	1
 m_seqTable:			rs.l	1
 m_currentSeq:		rs.w	1
 m_escCodeGetPos:	rs.w	1
+m_sampleBase:		rs.l	1	; pointer to the sound bank
 sizeof_LSPVars:		rs.w	0
 
 LSP_State:			ds.b	sizeof_LSPVars

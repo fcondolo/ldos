@@ -82,7 +82,9 @@ LDOS_GET_CLOCK_TICK					=	12*4
 ; out: d0.w 16bits
 LDOS_MUSIC_GET_SEQ_POS				=	13*4
 
-
+; out: a0.l LSP samples table (m_lspInstruments)
+; out: a1.l LSP sound bank (samples data)
+LDOS_GET_LSP_SAMPLE_TABLE			=	14*4
 
 LDOS_MEM_ANY_RAM		=	(1<<30)
 LDOS_MEM_CLEAR			=	(1<<29)

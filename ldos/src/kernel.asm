@@ -252,6 +252,7 @@ kernelLibrary:
 			bra.w	trackLoaderTick
 			bra.w	ldosGetClockTick
 			bra.w	LSP_MusicGetPos			; LDOS_MUSIC_GET_SEQ_POS
+			bra.w	LSP_GetSampleTable		; LDOS_GET_LSP_SAMPLE_TABLE
 			
 			opt o+		; enable
 			
